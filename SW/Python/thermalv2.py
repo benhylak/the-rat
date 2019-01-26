@@ -1,0 +1,132 @@
+from Adafruit_AMG88xx.Adafruit_AMG88xx import Adafruit_AMG88xx
+import pygame
+import cv2
+import sys
+import os
+import math
+import time
+from time import sleep
+
+import numpy as np
+import sys
+from scipy.interpolate import griddata
+
+from colour import Color
+
+#CV setup
+camera = cv2.VideoCapture(0)
+
+#low range of the sensor (this will be blue on the screen)
+MINTEMP = 18
+
+#high range of the sensor (this will be red on the screen)
+MAXTEMP = 28
+
+#how many color values we can have
+COLORDEPTH = 1024
+
+os.putenv('SDL_FBDEV', '/dev/fb1')
+pygame.init()
+#CV initialization
+pygame.display.set_caption("openCV stream")
+screen = pygame.display.set_mode([640,480])
+
+
+#initialize the sensor
+sensor = Adafruit_AMG88xx()
+
+points = [(math.floor(ix / 8), (ix % 8)) for ix in range(0, 64)]
+grid_x, grid_y = np.mgrid[0:7:32j, 0:7:32j]
+
+#sensor is an 8x8 grid so lets do a square
+height = 240
+width = 240
+
+#the list of colors we can choose from
+blue = Color("indigo")
+colors = list(blue.range_to(Color("red"), COLORDEPTH))
+
+#create the array of colors
+colors = [(int(c.red * 255), int(c.green * 255), int(c.blue * 255)) for c in colors]
+
+displayPixelWidth = width / 30
+displayPixelHeight = height / 30
+
+lcd = pygame.display.set_mode((width, height))
+
+lcd.fill((255,0,0))
+
+pygame.display.update()
+pygame.mouse.set_visible(False)
+
+lcd.fill((0,0,0))
+pygame.display.update()
+
+#some utility functions
+def constrain(val, min_val, max_val):
+    return min(max_val, max(min_val, val))
+
+def map(x, in_min, in_max, out_min, out_max):
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+
+#let the sensor initialize
+time.sleep(.1)
+    
+while(1):
+
+    #read the pixels
+    pixels = sensor.readPixels()
+    pixels = [map(p, MINTEMP, MAXTEMP, 0, COLORDEPTH - 1) for p in pixels]
+    
+    #perdorm interpolation
+    bicubic = griddata(points, pixels, (grid_x, grid_y), method='cubic')
+    
+    #draw everything
+    for ix, row in enumerate(bicubic):
+        for jx, pixel in enumerate(row):
+            pygame.draw.rect(lcd, colors[constrain(int(pixel), 0, COLORDEPTH- 1)], (displayPixelHeight * ix, displayPixelWidth * jx, displayPixelHeight, displayPixelWidth))
+    
+    ary1 = pixels[:len(pixels)//2]
+    ary2 = pixels[len(pixels)//2:]
+    burner1 = ary1[:len(ary1)//2]
+    burner2 = ary1[len(ary1)//2:]
+    burner3 = ary2[:len(ary2)//2]
+    burner4 = ary2[len(ary2)//2:]
+
+    avg1 = sum(burner1)/len(burner1)
+    avg2 = sum(burner2)/len(burner2)
+    avg3 = sum(burner3)/len(burner3)
+    avg4 = sum(burner4)/len(burner4)
+    
+    if avg1 > 350:
+        print("Burner1 is on")    
+    if avg2 > 350:
+        print("Burner2 is on")
+    if avg3 > 350:
+        print("Burner3 is on")
+    if avg4 > 350:
+        print("Burner4 is on")
+       
+    #print(ary2)
+    #print(sensor.readPixels())
+    #sleep(1)
+    pygame.display.update()
+    
+    #CV code
+try:
+    while True:
+        ret, frame = camera.read()
+        
+        screen.fill([0,0,0])
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame = np.rot90(frame)
+        screen.blit(frame,(0,0))
+        pygame.display.update()
+        
+        for event in pygame.event.get():
+            if event.type == KEYDOWN:
+                sys.exit(0)
+except (KeyboardInterrupt,SystemExit):
+    pygame.quit()
+    cv2.destroyAllWindows()
+
