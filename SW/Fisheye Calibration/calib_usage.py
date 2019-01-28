@@ -8,7 +8,7 @@ with open('parameters.yaml') as f:
 mtxloaded = loadeddict.get('camera_matrix')
 distloaded = loadeddict.get('dist_coeff')
 
-img = cv2.imread('image10.jpg')
+img = cv2.imread("/home/pi/the-rat/SW/Fisheye Calibration/Chess_Stove/image0.jpg")
 h, w = img.shape[:2]
 newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtxloaded,distloaded, (w,h), 0, (w,h))
 

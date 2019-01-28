@@ -19,7 +19,7 @@ objp[:,:2] = np.mgrid[0:CHECKERBOARD[1],0:CHECKERBOARD[0]].T.reshape(-1,2)
 objpoints = [] #3d point in a real world space
 imgpoints = [] #2d points in image plane
 
-images = glob.glob('*.jpg')
+images = glob.glob('/home/pi/the-rat/SW/Fisheye Calibration/Chess_Stove/*.jpg')
  
 for fname in images:
     img = cv2.imread(fname)

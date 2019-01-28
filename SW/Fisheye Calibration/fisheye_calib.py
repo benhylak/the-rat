@@ -11,7 +11,7 @@ criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
 CHECKERBOARD = (6,9)
 
 calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC+cv2.fisheye.CALIB_CHECK_COND+cv2.fisheye.CALIB_FIX_SKEW
-
+#calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC+cv2.fisheye.CALIB_FIX_SKEW
 #prepare object points and image points from all the images
 objp = np.zeros((1, CHECKERBOARD[0]*CHECKERBOARD[1],3),np.float32)
 objp[0,:,:2] = np.mgrid[0:CHECKERBOARD[0],0:CHECKERBOARD[1]].T.reshape(-1,2)
@@ -21,7 +21,7 @@ objpoints = [] #3d point in a real world space
 imgpoints = [] #2d points in image plane
 
 #searches for all jpgs within its folder
-images = glob.glob('*.jpg')
+images = glob.glob('/home/pi/the-rat/SW/Fisheye Calibration/Chess_Stove_3/*.jpg')
  
 for fname in images:
     img = cv2.imread(fname)
