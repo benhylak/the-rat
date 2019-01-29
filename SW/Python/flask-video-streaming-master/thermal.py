@@ -10,11 +10,12 @@ from scipy.interpolate import griddata
 
 from colour import Color
 
+TEMPON = 45
 #low range of the sensor (this will be blue on the screen)
 MINTEMP = 18
 
 #high range of the sensor (this will be red on the screen)
-MAXTEMP = 28
+MAXTEMP = 100
 
 #how many color values we can have
 COLORDEPTH = 1024
@@ -66,6 +67,35 @@ while(1):
 
     #read the pixels
     pixels = sensor.readPixels()
+
+    #split the display into 4 parts to represent each burner
+    ary1 = pixels[:len(pixels)/2]
+    ary2 = pixels[len(pixels)/2:]
+    burner1 = ary1[:len(ary1)/2]
+    burner2 = ary1[len(ary1)/2:]
+    burner3 = ary2[:len(ary2)/2]
+    burner4 = ary2[len(ary2)/2:]
+
+    #detect if a burner is on based on the average temperature
+    avg1 = sum(burner1)/len(burner1)
+    if avg1> TEMPON:
+        print ("UR burner on")
+    avg2 = sum(burner2)/len(burner2)
+    if avg2> TEMPON:
+        print ("UL burner on")
+    avg3 = sum(burner3)/len(burner3)
+    if avg3> TEMPON:
+        print ("LL burner on")
+    avg4 = sum(burner4)/len(burner4)
+    if avg4 >TEMPON:
+        print("LR burner on")
+
+    #get the temperature of each burner based on the maximum temperature
+    UR_temp = max(burner1)
+    UL_temp = max(burner2)
+    LL_temp = max(burner3)
+    LR_temp = max(burner4)
+    
     pixels = [map(p, MINTEMP, MAXTEMP, 0, COLORDEPTH - 1) for p in pixels]
     
     #perdorm interpolation
@@ -75,31 +105,7 @@ while(1):
     for ix, row in enumerate(bicubic):
         for jx, pixel in enumerate(row):
             pygame.draw.rect(lcd, colors[constrain(int(pixel), 0, COLORDEPTH- 1)], (displayPixelHeight * ix, displayPixelWidth * jx, displayPixelHeight, displayPixelWidth))
-    
-    ary1 = pixels[:len(pixels)//2]
-    ary2 = pixels[len(pixels)//2:]
-    burner1 = ary1[:len(ary1)//2]
-    burner2 = ary1[len(ary1)//2:]
-    burner3 = ary2[:len(ary2)//2]
-    burner4 = ary2[len(ary2)//2:]
-
-    avg1 = sum(burner1)/len(burner1)
-    avg2 = sum(burner2)/len(burner2)
-    avg3 = sum(burner3)/len(burner3)
-    avg4 = sum(burner4)/len(burner4)
-    
-    if avg1 > 350:
-        print("Burner1 is on")    
-    if avg2 > 350:
-        print("Burner2 is on")
-    if avg3 > 350:
-        print("Burner3 is on")
-    if avg4 > 350:
-        print("Burner4 is on")
-       
-    #print(ary2)
-    #print(sensor.readPixels())
-    #sleep(1)
+            
     pygame.display.update()
     pygame.image.save(lcd, "1.jpg")
     pygame.display.update()
