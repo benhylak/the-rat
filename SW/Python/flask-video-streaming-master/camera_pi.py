@@ -21,3 +21,10 @@ class Camera(BaseCamera):
                 # reset stream for next frame
                 stream.seek(0)
                 stream.truncate()
+
+    def closePiCam():
+        with picamera.PiCamera() as camera:
+            # let camera warm up
+            time.sleep(2)
+            # close camera
+            camera.close()

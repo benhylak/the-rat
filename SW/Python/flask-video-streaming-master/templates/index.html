@@ -1,9 +1,311 @@
-<html>
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <title>Video Streaming Demonstration</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>The Rat Debug Page</title>
+    <style type="text/css" media="screen">
+  * {
+    margin: 0px 0px 0px 0px;
+    padding: 0px 0px 0px 0px;
+  }
+
+  body, html {
+    padding: 3px 3px 3px 3px;
+
+    background-color: #D8DBE2;
+
+    font-family: Verdana, sans-serif;
+    font-size: 11pt;
+    text-align: center;
+  }
+
+  div.main_page {
+    position: relative;
+    display: table;
+
+    width: 800px;
+
+    margin-bottom: 3px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0px 0px 0px 0px;
+
+    border-width: 2px;
+    border-color: #212738;
+    border-style: solid;
+
+    background-color: #FFFFFF;
+
+    text-align: center;
+  }
+
+  div.page_header {
+    height: 99px;
+    width: 100%;
+
+    background-color: #F5F6F7;
+  }
+
+  div.page_header span {
+    margin: 15px 0px 0px 50px;
+
+    font-size: 180%;
+    font-weight: bold;
+  }
+
+  div.page_header img {
+    margin: 3px 0px 0px 40px;
+
+    border: 0px 0px 0px;
+  }
+
+  div.table_of_contents {
+    clear: left;
+
+    min-width: 200px;
+
+    margin: 3px 3px 3px 3px;
+
+    background-color: #FFFFFF;
+
+    text-align: left;
+  }
+
+  div.table_of_contents_item {
+    clear: left;
+
+    width: 100%;
+
+    margin: 4px 0px 0px 0px;
+
+    background-color: #FFFFFF;
+
+    color: #000000;
+    text-align: left;
+  }
+
+  div.table_of_contents_item a {
+    margin: 6px 0px 0px 6px;
+  }
+
+  div.content_section {
+    margin: 3px 3px 3px 3px;
+
+    background-color: #FFFFFF;
+
+    text-align: left;
+  }
+
+  div.content_section_text {
+    padding: 4px 8px 4px 8px;
+
+    color: #000000;
+    font-size: 100%;
+  }
+
+  div.content_section_text pre {
+    margin: 8px 0px 8px 0px;
+    padding: 8px 8px 8px 8px;
+
+    border-width: 1px;
+    border-style: dotted;
+    border-color: #000000;
+
+    background-color: #F5F6F7;
+
+    font-style: italic;
+  }
+
+  div.content_section_text p {
+    margin-bottom: 6px;
+  }
+
+  div.content_section_text ul, div.content_section_text li {
+    padding: 4px 8px 4px 16px;
+  }
+
+  div.section_header {
+    padding: 3px 6px 3px 6px;
+
+    background-color: #8E9CB2;
+
+    color: #FFFFFF;
+    font-weight: bold;
+    font-size: 112%;
+    text-align: center;
+  }
+
+  div.section_header_red {
+    background-color: #CD214F;
+  }
+
+  div.section_header_grey {
+    background-color: #9F9386;
+  }
+
+  .floating_element {
+    position: relative;
+    float: left;
+  }
+
+  div.table_of_contents_item a,
+  div.content_section_text a {
+    text-decoration: none;
+    font-weight: bold;
+  }
+
+  div.table_of_contents_item a:link,
+  div.table_of_contents_item a:visited,
+  div.table_of_contents_item a:active {
+    color: #000000;
+  }
+
+  div.table_of_contents_item a:hover {
+    background-color: #000000;
+
+    color: #FFFFFF;
+  }
+
+  div.content_section_text a:link,
+  div.content_section_text a:visited,
+   div.content_section_text a:active {
+    background-color: #DCDFE6;
+
+    color: #000000;
+  }
+
+  div.content_section_text a:hover {
+    background-color: #000000;
+
+    color: #DCDFE6;
+  }
+
+  div.validator {
+  }
+    </style>
   </head>
-  <body>
-    <h1>Video Streaming Demonstration</h1>
-    <img src="{{ url_for('video_feed') }}">
-  </body>
+   <head>
+        <title>Page Title</title>
+</head/>
+
+<div>
+<h3>The Rat Debug Page</h3>
+</div>
+
+<div>
+<img src="{{ url_for('video_feed') }}" height = "480" width = "640";">
+<img src="{{ url_for('video_feed_thermal') }}"height = "480" width = "640";">
+</div>
+
+<div>
+<form action="/reboot/" method="post">
+    <button name="reboot" type="submit">Reboot</button>
+</form>
+<form action="/stopcamera/" method="post">
+    <button name="stopcamera" type="submit">Stop PiCamera</button>
+</form>
+</div>
+
+<div>
+<input type="button" id="Start/Stop Console"  value="Console is OFF" onClick="consoleOnOff()"/>
+<script>
+ function consoleOnOff() {
+var elem = document.getElementById("Start/Stop Console");
+if (elem.value == "Console is OFF"){ 
+	elem.value = "Console is ON";
+	console.log("Console is starting");
+	fileReader();
+	//fetchTxt(); 
+       }
+else{
+	elem.value = "Console is OFF";
+	console.log("Console is closing");
+  }
+}
+  
+</script>  
+</div>
+
+<div style="background-color:lightblue">
+  <h3>CONSOLE</h3>
+    <body>
+<input type="file" name="file" id="file">
+<style>
+.center-div
+{
+     margin: 0 auto;
+     width: 700px; 
+}
+.container {
+  height: 100px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+
+</style>
+
+<div class="center-div">        
+<div id="logger1" class="container" style="width:700px; height:250px; border:1px solid #ccc;
+	font:16px/26px Georgia, Garamond, Serif;overflow:auto;"><div id="logger"></div> </div>
+</div>
+        
+        <script type="text/javascript">
+
+	    //Setup date and time
+	var d = new Date();
+        var n = d.toString();
+        
+            // Overriding console object
+            var console = {};
+            
+            // Getting div to insert logs
+            var logger = document.getElementById("logger");
+            
+            // Adding log method from our console object
+            console.log = function(text)
+            {
+                var element = document.createElement("div");
+                var txt = document.createTextNode(text + "   (" + n.slice(0,-32) + "EST" + ")");
+            
+                element.appendChild(txt);
+                logger.appendChild(element);
+            }
+            
+            
+            /**
+                console.log prints the message in the page instead browser console, useful to programming and debugging JS using a Android phone
+                
+            */
+        </script>
+
+	<script>
+	//Prints log text file to console
+
+	function fileReader(){
+	document.getElementById('file').onchange = function(){
+
+  	var file = this.files[0];
+
+  	var reader = new FileReader();
+  	reader.onload = function(progressEvent){
+    	// Entire file
+    	console.log(this.result);
+
+    	// By lines
+    	var lines = this.result.split('\n');
+    	for(var line = 0; line < lines.length; line++){
+      	console.log(lines[line]);
+    			}
+  		};
+  	reader.readAsText(file);
+	};
+}
+	</script>
+
+    </body>
+</div>
 </html>
+
