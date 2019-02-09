@@ -5,11 +5,14 @@ import cv2
 import glob
 from picamera import PiCamera
 
+image_path = "/home/pi/the-rat/SW/main/shot.jpg"
+
 # current matrices to be used, must be updated bc device was shifted
 K = np.array([[318.5047565963465, 0.0, 304.72174448074446], [0.0, 318.3070269260298, 234.84280567757642], [0.0, 0.0, 1.0]])
 D = np.array([[-0.041193383831182505], [0.012582938251747337], [-0.026474498577198458], [0.020393209710516367]])
 DIM = (480,640) # image dimensions
 
+camera = PiCamera()
 
 # takes an image path and undistorts the image with above matrices
 def undistort(img_path, balance = 0.0, dim2=None, dim3 = None):
@@ -35,10 +38,12 @@ def undistort(img_path, balance = 0.0, dim2=None, dim3 = None):
 
 # take picture from over the stove and pass it to undistort
 def capture():
-    camera = PiCamera()
+
     camera.rotation = 180
-    camera.capture('/home/pi/the-rat/SW/main/shot.jpg')
-    undistort('/home/pi/the-rat/SW/main/shot.jpg')
+    camera.capture(image_path)
+    undistort(image_path)
+
+    return image_path
 
 if __name__ == "__main__":
     main()

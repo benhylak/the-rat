@@ -22,6 +22,6 @@ while (True):
 
     thermal.update(stove)
 
-    capture()
+    image_path = capture()
 
     time.sleep(ITERATION_TIME)
