@@ -1,6 +1,7 @@
 import firebase_admin
 import time
 from firebase_admin import credentials, db
+from fisheye_usage_3 import capture
 
 from Stove import Stove
 from Thermal import Thermal
@@ -14,10 +15,12 @@ thermal = Thermal()
 stove = Stove()
 
 while (True):
-    
-    thermal.update(stove)
+
+    capture()
     
     for burner in [stove.upper_left, stove.lower_left, stove.lower_right, stove.upper_right]:
         db.child("burners").child(burner.name).set(vars(burner))
+
+    thermal.update(stove)
 
     time.sleep(3)

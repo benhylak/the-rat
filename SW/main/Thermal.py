@@ -75,12 +75,12 @@ class Thermal:
         pixels = self.sensor.readPixels()
 
         #split the display into 4 parts to represent each burner
-        ary1 = pixels[:len(pixels)/2]
-        ary2 = pixels[len(pixels)/2:]
-        burner1 = ary1[:len(ary1)/2]
-        burner2 = ary1[len(ary1)/2:]
-        burner3 = ary2[:len(ary2)/2]
-        burner4 = ary2[len(ary2)/2:]
+        ary1 = pixels[:int(len(pixels)/2)]
+        ary2 = pixels[int(len(pixels)/2):]
+        burner1 = ary1[:int(len(ary1)/2)]
+        burner2 = ary1[int(len(ary1)/2):]
+        burner3 = ary2[:int(len(ary2)/2)]
+        burner4 = ary2[int(len(ary2)/2):]
 
         #detect if a burner is on based on the average temperature
         avg1 = sum(burner1)/len(burner1)
