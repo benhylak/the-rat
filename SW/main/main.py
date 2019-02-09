@@ -1,6 +1,5 @@
 import firebase_admin
 import time
-from fisheye_usage_3 import undistort
 from firebase_admin import credentials, db
 
 from Stove import Stove
@@ -10,8 +9,6 @@ cred = credentials.Certificate('./ServiceAccountKey.json')
 default_app = firebase_admin.initialize_app(cred, {'databaseURL': 'https://the-rat-magic.firebaseio.com/'})
 
 db = db.reference("Stove")
-
-#undistort('/home/pi/the-rat/SW/main/hello.jpg')
 
 thermal = Thermal()
 stove = Stove()
