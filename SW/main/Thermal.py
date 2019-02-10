@@ -42,19 +42,19 @@ class ThermalMeasure:
         avg1 = sum(burner1)/len(burner1)
         if avg1> self.TEMPON:
             print ("UR burner on")
-            stove.upper_right.burner_on = True
+            stove.upper_right.on = True
         avg2 = sum(burner2)/len(burner2)
         if avg2> self.TEMPON:
             print ("UL burner on")
-            stove.upper_left.burner_on = True
+            stove.upper_left.on = True
         avg3 = sum(burner3)/len(burner3)
         if avg3> self.TEMPON:
             print ("LL burner on")
-            stove.lower_left.burner_on = True
+            stove.lower_left.on = True
         avg4 = sum(burner4)/len(burner4)
         if avg4 > self.TEMPON:
             print("LR burner on")
-            stove.lower_right.burner_on = True
+            stove.lower_right.on = True
 
         #get the temperature of each burner based on the maximum temperature
         UR_temp = max(burner1)
