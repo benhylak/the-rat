@@ -34,10 +34,10 @@ class PotDetector:
                 top_center = prediction.bounding_box.top + ((prediction.bounding_box.height)/2)
 
                 if (left_center > 0.5 and top_center < 0.5):
-                    stove.upper_right.on = True
+                    stove.upper_right.pot_detected = True
                 elif (left_center < 0.5 and top_center < 0.5):
-                    stove.upper_left.on = True
+                    stove.upper_left.pot_detected = True
                 elif (left_center < 0.5 and top_center > 0.5):
-                    stove.lower_left.on = True
+                    stove.lower_left.pot_detected = True
                 elif (left_center > 0.5 and top_center > 0.5):
-                    stove.lower_right.on = True
+                    stove.lower_right.pot_detected = True
