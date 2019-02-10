@@ -12,6 +12,8 @@ class PotDetector:
         self.prediction_key = "6212b24516c6492190c63d2b32084079"
         self.project_id = "a97fb679-77e7-4e07-b946-81c752ee3112"
 
+        self.probability_min = 60
+
         # Now there is a trained endpoint that can be used to make a prediction
 
         self.predictor = CustomVisionPredictionClient(self.prediction_key, endpoint=self.ENDPOINT)
@@ -27,7 +29,7 @@ class PotDetector:
         # Display the results.
         for prediction in results.predictions:
                 
-            if (prediction.probability * 100 > 80):
+            if (prediction.probability * 100 > self.probability_min):
                 left_center = prediction.bounding_box.left + ((prediction.bounding_box.width)/2)
                 top_center = prediction.bounding_box.top + ((prediction.bounding_box.height)/2)
 
