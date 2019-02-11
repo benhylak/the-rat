@@ -18,26 +18,25 @@ class PotDetector:
 
         self.predictor = CustomVisionPredictionClient(self.prediction_key, endpoint=self.ENDPOINT)
 
-    def update(self,image_path, stove):
+    def update(self, frame, stove):
         # Open the sample image and get back the prediction results.
-        with open(image_path, mode="rb") as test_data:
-            results = self.predictor.predict_image(self.project_id, test_data)
+        results = self.predictor.predict_image(self.project_id, frame)
         
-        left_center = 0.0
-        top_center = 0.0
+        center_x = 0.0
+        center_y = 0.0
 
         # Display the results.
         for prediction in results.predictions:
                 
             if (prediction.probability * 100 > self.probability_min):
-                left_center = prediction.bounding_box.left + ((prediction.bounding_box.width)/2)
-                top_center = prediction.bounding_box.top + ((prediction.bounding_box.height)/2)
+                center_x = prediction.bounding_box.left + ((prediction.bounding_box.width)/2)
+                center_y = prediction.bounding_box.top + ((prediction.bounding_box.height)/2)
 
-                if (left_center > 0.5 and top_center < 0.5):
+                if (center_x > 0.5 and center_y < 0.5):
                     stove.upper_right.pot_detected = True
-                elif (left_center < 0.5 and top_center < 0.5):
+                elif (center_x < 0.5 and center_y < 0.5):
                     stove.upper_left.pot_detected = True
-                elif (left_center < 0.5 and top_center > 0.5):
+                elif (center_x < 0.5 and center_y > 0.5):
                     stove.lower_left.pot_detected = True
-                elif (left_center > 0.5 and top_center > 0.5):
+                elif (center_x > 0.5 and center_y > 0.5):
                     stove.lower_right.pot_detected = True
