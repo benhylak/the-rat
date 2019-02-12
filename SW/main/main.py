@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import firebase_admin
 import time
+import argparse
 from firebase_admin import credentials, db
 from capture_undistorted import capture
 
@@ -8,7 +9,13 @@ from Stove import Stove
 from Thermal import ThermalMeasure
 from pot_detection import PotDetector
 
-ITERATION_TIME = 7
+ITERATION_TIME = 0.5
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--detect-pots', action='store_true')
+parser.add_argument('--update-time', type=int)
+args = parser.parse_args()
+
 cred = credentials.Certificate('/home/pi/the-rat/SW/main/ServiceAccountKey.json')
 default_app = firebase_admin.initialize_app(cred, {'databaseURL': 'https://the-rat-magic.firebaseio.com/'})
 
@@ -26,8 +33,14 @@ while (True):
     image_path = capture()
 
     with open(image_path, mode="rb") as frame:
-        pot_detector.update(frame, stove)
+        if(args.detect_pots == True):
+            pot_detector.update(frame, stove)
 
     thermal.update(stove)
+    
+    if(args.update_time != None):
+        update_time = args.update_time
+    else:
+        update_time = ITERATION_TIME
 
-    time.sleep(ITERATION_TIME)
+    time.sleep(update_time)
