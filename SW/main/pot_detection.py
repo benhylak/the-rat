@@ -25,6 +25,11 @@ class PotDetector:
         center_x = 0.0
         center_y = 0.0
 
+        stove.upper_right.pot_detected = False
+        stove.upper_left.pot_detected = False
+        stove.lower_left.pot_detected = False
+        stove.lower_right.pot_detected = False
+
         # Display the results.
         for prediction in results.predictions:
                 
