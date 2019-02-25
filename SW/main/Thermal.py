@@ -40,18 +40,22 @@ class ThermalMeasure:
         i = 0       
         avg = 0.0
 
-        #turn input image into grayscale
+        #blur image to help avoid smaller contours within burner
         blurred_in = cv2.GaussianBlur(img_in, (7, 7), 0)
+        #give image rgb dimensions to turn it into grayscale
         im_in = np.stack((blurred_in,) * 3,-1)
         im_in = im_in.astype(np.uint8)
         bgr_in = cv2.cvtColor(im_in, cv2.COLOR_RGB2BGR)
+        #turn image into grayscale
         gray_in = cv2.cvtColor(bgr_in, cv2.COLOR_BGR2GRAY)
 
-	#turn output image into grayscale
+		#blur image to help avoid smaller contours within burner
         blurred_out = cv2.GaussianBlur(img_out, (7, 7), 0)
+        #give image rgb dimensions to turn it into grayscale
         im_out = np.stack((blurred_out,) * 3,-1)
         im_out = im_out.astype(np.uint8)
         bgr_out = cv2.cvtColor(im_out, cv2.COLOR_RGB2BGR)
+        #turn image into grayscale
         gray_out = cv2.cvtColor(bgr_out, cv2.COLOR_BGR2GRAY)
 
 	#find and draw contours
@@ -63,6 +67,7 @@ class ThermalMeasure:
 
 	#check for the number of contours
         if len(contours) != 0:
+        	#if there's more than one contour, set the index of the contour to be considered to that of the largest contour
             if len(contours)>1:
                 for self.i in range(len(contours)):
                     area = cv2.contourArea(contours[i])
@@ -71,8 +76,9 @@ class ThermalMeasure:
                     c = contours[max_contour]
             else:
                 c = contours[0]
-            
-            c_index = contours.index(c)    
+            #set contour index
+            c_index = contours.index(c)  
+            #get contour area  
             c_area = cv2.contourArea(c)
         else:
             c_index = None
@@ -85,6 +91,7 @@ class ThermalMeasure:
         if c_index != None:
             reverse_map = [self.map(p, min(lst_intensities[c_index]), max(lst_intensities[c_index]), min(pixels_in), max(pixels_in)) for p in lst_intensities[c_index]]
             if len(reverse_map) != 0:
+            	#only consider contours of area larger than the minimum area
                 if c_area > 20: 
                     avg = sum(reverse_map)/len(reverse_map)
                 else:
@@ -110,11 +117,13 @@ class ThermalMeasure:
         pixels_out = [self.map(p, min(pixels), max(pixels), 0, 240) for p in pixels]
         bicubic_out = griddata(self.points, pixels_out, (self.grid_x, self.grid_y), method='cubic')
 
-        #output picture has the pixel values mapped correctly
+        #convert output image to numpy array
         out = np.array(bicubic_out)
 
+        #set a temperature cap
         pixels_cap = [max(min(p, 80), 0) for p in pixels]
 
+        #if maximum temperature is lower than the threshold, map maximum color to cap temperature
         if max(pixels_cap) < 30:
             pixels_in = [self.map(p, min(pixels_cap), 80, 0, 240) for p in pixels_cap]
         else:
@@ -122,7 +131,7 @@ class ThermalMeasure:
 
         bicubic_in = griddata(self.points, pixels_in, (self.grid_x, self.grid_y), method='cubic')
 
-        #input image has a cap on the maximum temperature
+        #convert input image to numpy array
         img = np.array(bicubic_in)
 
         img.resize((32,32))

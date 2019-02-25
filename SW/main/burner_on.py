@@ -8,12 +8,14 @@ class BurnerOn:
         self.off = True
         
     def decreasing_temp(self, average):
+        #record a temperature value every 30 times more the iteration time in the main code
         while self.i < 360:
             if (self.i % 30 == 0):
                 self.decreasing.append(average)
             self.i += 1
             break
 
+        #when twelve values have been collected, check for decreasing pattern and start the process over
         if len(self.decreasing) == 12:
             dx = np.diff(self.decreasing)
             self.i = 0
