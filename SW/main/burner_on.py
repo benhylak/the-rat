@@ -1,22 +1,24 @@
 import Stove
 import numpy as np
 
-class BurnerOn:
+class BurnerOnDetector:
     def __init__(self):
-        self.i = 0
+        self.i = 0  #iteration time passed
         self.decreasing = []
         self.off = True
+        self.max_time = 200 #number of iterations passed
+        self.sample_time = 20 #record a sample every 20 iterations
+        self.max_samples = 10 #the number of samples in the array
+        self.min_temp = 35 #minimum temperature to consider burner on
         
-    def decreasing_temp(self, average):
-        #record a temperature value every 30 times more the iteration time in the main code
-        while self.i < 360:
-            if (self.i % 30 == 0):
-                self.decreasing.append(average)
+    def decreasing_temp(self, temp):
+        while self.i < self.max_time:
+            if (self.i % self.sample_time == 0):
+                self.decreasing.append(temp)
             self.i += 1
             break
 
-        #when twelve values have been collected, check for decreasing pattern and start the process over
-        if len(self.decreasing) == 12:
+        if len(self.decreasing) == self.max_samples:
             dx = np.diff(self.decreasing)
             self.i = 0
             self.decreasing = []
@@ -24,57 +26,23 @@ class BurnerOn:
             return np.all(dx <= 0)
         else:
             return None
+            
+    def burner_on(self, burner):
+        if (burner.temp != 0 and burner.temp > self.min_temp):
+            self.decreasing_temp(burner.temp)
+            off = self.off
+            if burner.pot_detected == False:
+                if off == False:
+                    burner.on = True
+                else:
+                    burner.on = False
+            else:
+                burner.on = False
+        else:
+            burner.on = False
 
     def update(self, stove):
-        if (stove.upper_right.temp != 0):
-            self.decreasing_temp(stove.upper_right.temp)
-            upper_right_on = self.off
-            if stove.upper_right.pot_detected == False:
-                if upper_right_on == False:
-                    stove.upper_right.on = True
-                else:
-                    stove.upper_right.on = False
-            else:
-                stove.upper_right.on = False
-        else:
-            stove.upper_right.on = False
-            
-        if (stove.upper_left.temp !=0):
-            self.decreasing_temp(stove.upper_left.temp)
-            upper_left_on = self.off
-            if stove.upper_left.pot_detected == False:
-                if upper_left_on == False:
-                    stove.upper_left.on = True
-                else:
-                    stove.upper_left.on = False
-            else:
-                stove.upper_left.on = False
-        else:
-            stove.upper_left.on = False
-
-        if (stove.lower_left.temp != 0):
-            self.decreasing_temp(stove.lower_left.temp)
-            lower_left_on = self.off
-            if stove.lower_left.pot_detected == False:
-                if lower_left_on == False:
-                    stove.lower_left.on = True
-                else:
-                    stove.lower_left.on = False
-            else:
-                stove.lower_left.on = False
-        else:
-            stove.lower_left.on = False
-            
-        if (stove.lower_right.temp !=0):
-            self.decreasing_temp(stove.lower_right.temp)
-            lower_right_on = self.off
-            if stove.lower_right.pot_detected == False:
-                if lower_right_on == False:
-                    stove.lower_right.on = True
-                else:
-                    stove.lower_right.on = False
-            else:
-                stove.lower_right.on = False
-        else:
-            stove.lower_right.on = False
-            
+        self.burner_on(stove.upper_right)
+        self.burner_on(stove.upper_left)
+        self.burner_on(stove.lower_left)
+        self.burner_on(stove.lower_right)
