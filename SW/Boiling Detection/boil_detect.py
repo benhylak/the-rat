@@ -6,21 +6,23 @@ import time
 
 class BoilDetector:
 
-    def __init__self(self, name):
-        self.name = name # tells which burner it will belong to
-        self.temp = 170 # boiling temp of the burner, from thermal camera threshold
-        self.frame_count = 0
-        self.count = 1 # frequency of frames being recorded
+    def __init__self(self):
+        self.temp = 170 # temp considered to be boiling
+        self.frame_count = 0 # frames that have passed
+        self.count = 1 # frequency of frames being compared
         self.thresh = 0.985 # thresh to boil
-        self.SSIM_count = 5
+        self.SSIM_count = 5 # how often median will be found
 
-        self.median_SSIM = [[],[],[],[]]
-        self.boiling = []
-        self.start_boiling = []
-        self.began_boiling = [False,False,False,False]
-        self.masks = []
+        self.median_SSIM = [[],[],[],[]] # SSIMS recorded until median is found
+        self.boiling = [] # boiling list holding median SSIMs found
+        self.start_boiling = [0,0,0,0] # times each burner started boiling
+        self.began_boiling = [False,False,False,False] # if each burner has been detected to be boiling
+        self.masks = [] # mask used for each burner
+
         self.first_image = None
         self.second_image = None
+        self.first_quads = [None,None,None,None]
+        self.second_quads = [None,None,None,None]
 
     def __compare_images(self, gray1, gray2):
         """
@@ -34,7 +36,6 @@ class BoilDetector:
         diff = (diff * 255).astype("uint8")
 
         return score
-
 
     def __create_mask(self, img):
         """
@@ -75,7 +76,6 @@ class BoilDetector:
         cv2.ellipse(mask, (x, y), (a, b), theta, 0, 360, ((255, 255, 255)), -1)
         return mask
 
-
     def __apply_mask(self, img, mask):
         """
         Applies the given mask to the input image.
@@ -86,10 +86,10 @@ class BoilDetector:
         copy = img.copy()
         return cv2.bitwise_and(copy, copy, mask=mask)
 
-
     def __split_frame(self, frame):
         """
         Takes input frame and splits it into 4 equal quadrants.
+        Best bet so far would be to take in distorted frame.
         :param frame: Frame to be split.
         :return: Four images representing the split frame.
         """
@@ -104,8 +104,14 @@ class BoilDetector:
 
         return [first_quad, second_quad, third_quad, fourth_quad]
 
-
     def ___get_score(self, mask, quad1, quad2):
+        """
+        Helper function to return SSIM score between two images
+        :param mask: Mask to be applied to image
+        :param quad1: First image quadrant being compared
+        :param quad2: Second image quadrant
+        :return:
+        """
         masked1 = self.__apply_mask(quad1, mask)
         masked2 = self.__apply_mask(quad2, mask)
 
@@ -116,18 +122,16 @@ class BoilDetector:
         # compare the two images
         return self.__compare_images(gray1, gray2)
 
-
-    def __check_boiling(boiling, THRESH):
+    def __check_boiling(boiling, thresh):
         """
         Checks to see if the past values recorded in boiling
         average out to be less than a given boiling threshhold.
         :param boiling: List containing an X number of median SSIM's
-        :param THRESH: Value signaling if average has fallen beneath certain boiling thresh
+        :param thresh: Value signaling if average has fallen beneath certain boiling thresh
         :return: Boolean signaling if the input list values indicate boiling
         """
         average = sum(boiling) / len(boiling)
-        # average = np.median(boiling)
-        if average < THRESH:
+        if average < thresh:
             return True
         else:
             return False
@@ -145,48 +149,61 @@ class BoilDetector:
         burners.append(stove.lower_right)
         return burners
 
+    def __initialize_masks(self,burners):
+        """
+        Refreshes mask if a pot is newly detected on the burners.
+        :param burners: Stove burners
+        """
+        masks = self.masks
+        for mask,burner,quad in zip(masks,burners,self.first_quads):
+            # mask never made before
+            if mask is None and quad is not None and burner.pot_detected:
+                self.masks.append(self.__create_mask(quad))
+            # if pot no longer detected resets the mask
+            elif burner.pot_detected is False:
+                idx = masks.index(mask)
+                self.masks[idx] = None
+
     def update(self, frame, stove):
         """
-        Takes an input frame and checks to see if a boiling state has occured on any of the
-        active burners.
-        :param frame: Input frame used to check boiling status
-        :param burnerStates: list saying which burners have a pot on them
-        :return: list of Booleans identifying Burner boil state
+        Takes an input frame and updates the boiling state of the burners.
+        :param frame: Input frame used to update boiling status
+        :param stove: Stove object holding current stove state
         """
-
-        # used to figure out when new frame will be taken
+        # updates frame_count
         self.frame_count = self.frame_count + 1
-        start_time = time.time()
+        burners = self.__burners(stove)
+
+        # creates new masks if a pot was added
+        self.initialize_masks(burners)
 
         # if program has not executed before
         if self.first_image is None:
             self.first_image = frame
-            first_quads = self.__split_frame(self.first_image)
-            # create a mask for each quad once
-            for b in first_quads:
-                self.masks.append(self.__create_mask(b))
+            self.first_quads = self.__split_frame(self.first_image)
 
         # if the number of frames that have been processed are desired amount, proceed
         elif self.frame_count == self.count:
             # if there is no second image recorded yet
             if self.second_image is None:
                 self.second_image = frame
-                second_quads = self.__split_frame(self.second_image)
+                self.second_quads = self.__split_frame(self.second_image)
             # second image does exist, must shift images
             else:
                 self.first_image = self.second_image
                 self.second_image = frame
-                first_quads = self.__split_frame(self.first_image)
-                second_quads = self.__split_frame(self.second_image)
 
-            burners = self.__burners(stove)
-            # Detects boiling depending on activated burners, iterates through active burners
+            # splits the frames
+            self.first_quads = self.__split_frame(self.first_image)
+            self.second_quads = self.__split_frame(self.second_image)
+
+            # Detects boiling on active burners
             i = 0
             for burner in burners:
                 # if there is a pot on burner
-                if burner.boiling:
+                if burner.pot_detected:
                     mask = self.masks[i]
-                    score = self.___get_score(mask, first_quads[i], second_quads[i])
+                    score = self.___get_score(mask, self.first_quads[i], self.second_quads[i])
                     self.median_SSIM[i].append(score)
 
                     # median is calculated when enough SSIMs have been recorded
@@ -197,8 +214,8 @@ class BoilDetector:
 
                     # ensures that the boiling list is not empty before trying to calculate status
                     if len(self.boiling[i]) > 0:
-                        # waits to set boiling flag until 30 seconds has passed and the beganBoiling flag remains true
-                        if self.began_boiling[i] and time.time() - start_time >= 30:
+                        # waits to set boiling flag until 30 seconds has passed and the began_boiling flag remains true
+                        if self.began_boiling[i] and time.time() - self.start_boiling[i] >= 30:
                             burner.boiling = True
                         elif self.began_boiling[i]:
                             self.began_boiling[i] = self.__check_boiling(self.boiling[i], self.thresh)
