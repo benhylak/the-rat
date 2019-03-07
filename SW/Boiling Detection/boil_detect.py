@@ -7,9 +7,9 @@ import time
 class BoilDetector:
 
     def __init__self(self):
-        self.temp = 170 # temp considered to be boiling
-        self.frame_count = 0 # frames that have passed
-        self.count = 1 # frequency of frames being compared
+        self.MIN_BOILING_TEMP = 170 # temp considered to be boiling
+        self.frames_elapsed = 0 # frames that have passed
+        self.frame_frequency = 1 # frequency of frames being compared
         self.thresh = 0.985 # thresh to boil
         self.SSIM_count = 5 # how often median will be found
 
@@ -19,10 +19,10 @@ class BoilDetector:
         self.began_boiling = [False,False,False,False] # if each burner has been detected to be boiling
         self.masks = [] # mask used for each burner
 
-        self.first_image = None
-        self.second_image = None
-        self.first_quads = [None,None,None,None]
-        self.second_quads = [None,None,None,None]
+        self.last_image = None
+        self.current_image = None
+        self.last_quads = [None,None,None,None]
+        self.current_quads = [None,None,None,None]
 
     def __compare_images(self, gray1, gray2):
         """
@@ -136,26 +136,13 @@ class BoilDetector:
         else:
             return False
 
-    def __burners(self,stove):
-        """
-        Returns a list of the Burners in the Stove object
-        :param stove: Stove object
-        :return: List of the burners
-        """
-        burners = []
-        burners.append(stove.upper_left)
-        burners.append(stove.upper_right)
-        burners.append(stove.lower_left)
-        burners.append(stove.lower_right)
-        return burners
-
     def __initialize_masks(self,burners):
         """
         Refreshes mask if a pot is newly detected on the burners.
         :param burners: Stove burners
         """
         masks = self.masks
-        for mask,burner,quad in zip(masks,burners,self.first_quads):
+        for mask,burner,quad in zip(masks,burners,self.last_quads):
             # mask never made before
             if mask is None and quad is not None and burner.pot_detected:
                 self.masks.append(self.__create_mask(quad))
@@ -170,71 +157,68 @@ class BoilDetector:
         :param frame: Input frame used to update boiling status
         :param stove: Stove object holding current stove state
         """
-        # updates frame_count
-        self.frame_count = self.frame_count + 1
-        burners = self.__burners(stove)
+        # updates frames_elapsed
+        self.frames_elapsed = self.frames_elapsed + 1
+        burners = stove.get_burners()
 
         # creates new masks if a pot was added
         self.initialize_masks(burners)
 
         # if program has not executed before
-        if self.first_image is None:
-            self.first_image = frame
-            self.first_quads = self.__split_frame(self.first_image)
+        if self.last_image is None:
+            self.last_image = frame
+            self.last_quads = self.__split_frame(self.last_image)
 
         # if the number of frames that have been processed are desired amount, proceed
-        elif self.frame_count == self.count:
+        elif self.frames_elapsed == self.frame_frequency:
             # if there is no second image recorded yet
-            if self.second_image is None:
-                self.second_image = frame
-                self.second_quads = self.__split_frame(self.second_image)
+            if self.current_image is None:
+                self.current_image = frame
+                self.current_quads = self.__split_frame(self.current_image)
             # second image does exist, must shift images
             else:
-                self.first_image = self.second_image
-                self.second_image = frame
+                self.last_image = self.current_image
+                self.current_image = frame
 
             # splits the frames
-            self.first_quads = self.__split_frame(self.first_image)
-            self.second_quads = self.__split_frame(self.second_image)
+            self.last_quads = self.__split_frame(self.last_image)
+            self.current_quads = self.__split_frame(self.current_image)
 
             # Detects boiling on active burners
-            i = 0
+            curr_idx = 0 # index corresponding to current burner
             for burner in burners:
                 # if there is a pot on burner
                 if burner.pot_detected:
-                    mask = self.masks[i]
-                    score = self.___get_score(mask, self.first_quads[i], self.second_quads[i])
-                    self.median_SSIM[i].append(score)
+                    mask = self.masks[curr_idx]
+                    score = self.___get_score(mask, self.last_quads[curr_idx], self.current_quads[curr_idx])
+                    self.median_SSIM[curr_idx].append(score)
 
                     # median is calculated when enough SSIMs have been recorded
-                    if len(self.median_SSIM[i]) == self.SSIM_count:
-                        med = np.median(self.median_SSIM[i])
-                        self.boiling[i].append(med)
-                        self.median_SSIM[i].clear()
+                    if len(self.median_SSIM[curr_idx]) == self.SSIM_count:
+                        med = np.median(self.median_SSIM[curr_idx])
+                        self.boiling[curr_idx].append(med)
+                        self.median_SSIM[curr_idx].clear()
 
                     # ensures that the boiling list is not empty before trying to calculate status
-                    if len(self.boiling[i]) > 0:
+                    if len(self.boiling[curr_idx]) > 0:
                         # waits to set boiling flag until 30 seconds has passed and the began_boiling flag remains true
-                        if self.began_boiling[i] and time.time() - self.start_boiling[i] >= 30:
+                        if self.began_boiling[curr_idx] and time.time() - self.start_boiling[curr_idx] >= 30:
                             burner.boiling = True
-                        elif self.began_boiling[i]:
-                            self.began_boiling[i] = self.__check_boiling(self.boiling[i], self.thresh)
+                        elif self.began_boiling[curr_idx]:
+                            self.began_boiling[curr_idx] = self.__check_boiling(self.boiling[curr_idx], self.thresh)
                             # if beganBoiling becomes false, resets the flag
-                            if not self.began_boiling[i]:
-                                self.start_boiling[i] = time.time()  # sets time to when it began boiling
+                            if not self.began_boiling[curr_idx]:
+                                self.start_boiling[curr_idx] = time.time()  # sets time to when it began boiling
                         else:
-                            self.began_boiling[i] = self.__check_boiling(self.boiling[i], self.thresh)
-                            self.start_boiling[i] = time.time() # keeps track of time when started boiling
-                            if self.began_boiling[i] or time.time() >= 30:
-                                self.boiling[i].clear()  # clear the boiling list for new values to be collected
-                i = i + 1
+                            self.began_boiling[curr_idx] = self.__check_boiling(self.boiling[curr_idx], self.thresh)
+                            self.start_boiling[curr_idx] = time.time() # keeps track of time when started boiling
+                            if self.began_boiling[curr_idx] or time.time() >= 30:
+                                self.boiling[curr_idx].clear()  # clear the boiling list for new values to be collected
+                curr_idx = curr_idx + 1
 
         # sets appropriate stove burners to boiling
-        if burners[0].boiling and stove.upper_left.temp >= self.temp:
-            stove.upper_left = True
-        if burners[1].boiling and stove.upper_right.temp >= self.temp:
-            stove.upper_right = True
-        if burners[2].boiling and stove.lower_left.temp >= self.temp:
-            stove.lower_left = True
-        if burners[3].boiling and stove.lower_right.temp >= self.temp:
-            stove.lower_right = True
+        for burner in burners:
+            if burner.boiling and burner.temp >= self.MIN_BOILING_TEMP:
+                burner.boiling = True # keeps True value
+            else:
+                burner.boiling = False # changes if temp not high enough
