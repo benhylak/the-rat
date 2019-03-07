@@ -2,6 +2,7 @@ from skimage.measure import compare_ssim
 import cv2
 import numpy as np
 import time
+import queue
 
 
 class BoilDetector:
@@ -13,8 +14,14 @@ class BoilDetector:
         self.thresh = 0.985 # thresh to boil
         self.SSIM_count = 5 # how often median will be found
 
-        self.median_SSIM = [[],[],[],[]] # SSIMS recorded until median is found
-        self.boiling = [] # boiling list holding median SSIMs found
+        self.median_SSIM = [queue.Queue(maxsize=self.SSIM_count),
+                            queue.Queue(maxsize=self.SSIM_count),
+                            queue.Queue(maxsize=self.SSIM_count),
+                            queue.Queue(maxsize=self.SSIM_count)]  # SSIMS recorded until median is found
+        self.boiling = [queue.Queue(maxsize=self.SSIM_count),
+                        queue.Queue(maxsize=self.SSIM_count),
+                        queue.Queue(maxsize=self.SSIM_count),
+                        queue.Queue(maxsize=self.SSIM_count)] # boiling queues holding the median SSIMs found
         self.start_boiling = [0,0,0,0] # times each burner started boiling
         self.began_boiling = [False,False,False,False] # if each burner has been detected to be boiling
         self.masks = [] # mask used for each burner
@@ -126,11 +133,11 @@ class BoilDetector:
         """
         Checks to see if the past values recorded in boiling
         average out to be less than a given boiling threshhold.
-        :param boiling: List containing an X number of median SSIM's
+        :param boiling: Queue containing an X number of median SSIM's
         :param thresh: Value signaling if average has fallen beneath certain boiling thresh
         :return: Boolean signaling if the input list values indicate boiling
         """
-        average = sum(boiling) / len(boiling)
+        average = sum(list(boiling.queue())) / boiling.qsize()
         if average < thresh:
             return True
         else:
@@ -157,6 +164,9 @@ class BoilDetector:
         :param frame: Input frame used to update boiling status
         :param stove: Stove object holding current stove state
         """
+        # time function begins
+        start_time = time.time()
+
         # updates frames_elapsed
         self.frames_elapsed = self.frames_elapsed + 1
         burners = stove.get_burners()
@@ -191,16 +201,19 @@ class BoilDetector:
                 if burner.pot_detected:
                     mask = self.masks[curr_idx]
                     score = self.___get_score(mask, self.last_quads[curr_idx], self.current_quads[curr_idx])
-                    self.median_SSIM[curr_idx].append(score)
+
+                    # pops element from median values if queue is full
+                    if self.median_SSIM[curr_idx].full():
+                        self.median_SSIM[curr_idx].get()
+                    self.median_SSIM[curr_idx].put(score)
 
                     # median is calculated when enough SSIMs have been recorded
-                    if len(self.median_SSIM[curr_idx]) == self.SSIM_count:
-                        med = np.median(self.median_SSIM[curr_idx])
-                        self.boiling[curr_idx].append(med)
-                        self.median_SSIM[curr_idx].clear()
+                    if self.median_SSIM[curr_idx].qsize() == self.SSIM_count:
+                        med = np.median(list(self.median_SSIM[curr_idx].queue()))
+                        self.boiling[curr_idx].put(med)
 
                     # ensures that the boiling list is not empty before trying to calculate status
-                    if len(self.boiling[curr_idx]) > 0:
+                    if self.boiling[curr_idx].qsize() > 0:
                         # waits to set boiling flag until 30 seconds has passed and the began_boiling flag remains true
                         if self.began_boiling[curr_idx] and time.time() - self.start_boiling[curr_idx] >= 30:
                             burner.boiling = True
@@ -212,8 +225,10 @@ class BoilDetector:
                         else:
                             self.began_boiling[curr_idx] = self.__check_boiling(self.boiling[curr_idx], self.thresh)
                             self.start_boiling[curr_idx] = time.time() # keeps track of time when started boiling
-                            if self.began_boiling[curr_idx] or time.time() >= 30:
-                                self.boiling[curr_idx].clear()  # clear the boiling list for new values to be collected
+
+                            # remove one element from the queue every time 30 seconds have passed or boiling began
+                            if self.began_boiling[curr_idx] or time.time() - start_time >= 30:
+                                self.boiling[curr_idx].get()
                 curr_idx = curr_idx + 1
 
         # sets appropriate stove burners to boiling
