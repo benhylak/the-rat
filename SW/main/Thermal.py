@@ -6,6 +6,7 @@ import math
 import time
 import cv2
 from time import sleep
+from moving_average import MovingAverage
 
 import numpy as np
 from scipy.interpolate import griddata
@@ -34,7 +35,7 @@ class ThermalMeasure:
         self.width = 32
         
         #minimum contour area
-        self.min_area = 70
+        self.min_area = 20
         
         #minimum temperature 
         self.min_temp = 30
@@ -44,12 +45,18 @@ class ThermalMeasure:
         
         #maximum color mapping
         self.max_color = 240
+        
+        self.max_samples = 20 #the number of samples in the temperature average array
+        self.moving_average_ur = MovingAverage(self.max_samples)
+        self.moving_average_ul = MovingAverage(self.max_samples)
+        self.moving_average_ll = MovingAverage(self.max_samples)
+        self.moving_average_lr = MovingAverage(self.max_samples)
 
     @staticmethod
     def map(x, in_min, in_max, out_min, out_max):
       return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 
-    def get_temperature(self, img_in, img_out, pixels_in):
+    def get_temperature(self, img_in, img_out, pixels_in, moving_average):
 
         lst_intensities = []
         areas = []
@@ -104,13 +111,18 @@ class ThermalMeasure:
             # map the color values back to temperature values
             reverse_map = [self.map(p, min(lst_intensities[c_index]), max(lst_intensities[c_index]), min(pixels_in), max(pixels_in)) for p in lst_intensities[c_index]]
             if len(reverse_map) != 0:
-                if c_area > self.min_area: 
-                    avg = sum(reverse_map)/len(reverse_map)
+                if c_area > self.min_area:
+                    temp = sum(reverse_map)/len(reverse_map)
+                    #use the moving average array passed in to get the average of temperature over time
+                    temp_avg = moving_average.process(temp)
+                    #calculate the average of averages in the moving array
+                    avg = sum(temp_avg)/len(temp_avg)
+                                                        
                 else:
                     avg = 0.0
         else:
             avg = 0.0
-            
+        
         return avg
 
     def update(self, stove):
@@ -153,16 +165,16 @@ class ThermalMeasure:
 
         upper_left_in = img[0:int((self.width/2)), 0:int((self.height/2))]
         upper_left_out = out[0:int((self.width/2)), 0:int((self.height/2))]
-        stove.upper_left.temp = self.get_temperature(upper_left_in, upper_left_out, pixels_ul)
+        stove.upper_left.temp = self.get_temperature(upper_left_in, upper_left_out, pixels_ul, self.moving_average_ul)
 
         lower_left_in = img[int((self.width/2)):self.width, 0:int((self.height/2))]
         lower_left_out = out[int((self.width/2)):self.width, 0:int((self.height/2))]
-        stove.lower_left.temp = self.get_temperature(lower_left_in, lower_left_out, pixels_ll)
+        stove.lower_left.temp = self.get_temperature(lower_left_in, lower_left_out, pixels_ll, self.moving_average_ll)
         
         upper_right_in = img[0:int((self.width/2)), int((self.height/2)):self.height]
         upper_right_out = out[0:int((self.width/2)), int((self.height/2)):self.height]
-        stove.upper_right.temp = self.get_temperature(upper_right_in, upper_right_out, pixels_ur)
+        stove.upper_right.temp = self.get_temperature(upper_right_in, upper_right_out, pixels_ur, self.moving_average_ur)
 
         lower_right_in = img[int((self.width/2)):self.width, int((self.height/2)):self.height]
         lower_right_out = out[int((self.width/2)):self.width, int((self.height/2)):self.height]
-        stove.lower_right.temp = self.get_temperature(lower_right_in, lower_right_out, pixels_lr)
+        stove.lower_right.temp = self.get_temperature(lower_right_in, lower_right_out, pixels_lr, self.moving_average_lr)
