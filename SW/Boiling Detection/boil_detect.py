@@ -3,6 +3,14 @@ import cv2
 import numpy as np
 import time
 import queue
+import MovingAverage
+import enum
+
+
+class BoilState(enum.Enum):
+    not_boiling = 0
+    is_simmering = 1
+    is_boiling = 2
 
 
 class BoilDetector:
@@ -13,17 +21,24 @@ class BoilDetector:
         self.frame_frequency = 1 # frequency of frames being compared
         self.thresh = 0.985 # thresh to boil
         self.SSIM_count = 5 # how often median will be found
+        self.BOIL_COUNT = 10 # window size of the boiling list
+        self.state = [BoilState.not_boiling,BoilState.not_boiling,BoilState.not_boiling,BoilState.not_boiling] # keeps track of each burner's state, default no-boiling
 
-        self.median_SSIM = [queue.Queue(maxsize=self.SSIM_count),
-                            queue.Queue(maxsize=self.SSIM_count),
-                            queue.Queue(maxsize=self.SSIM_count),
-                            queue.Queue(maxsize=self.SSIM_count)]  # SSIMS recorded until median is found
-        self.boiling = [queue.Queue(maxsize=self.SSIM_count),
-                        queue.Queue(maxsize=self.SSIM_count),
-                        queue.Queue(maxsize=self.SSIM_count),
-                        queue.Queue(maxsize=self.SSIM_count)] # boiling queues holding the median SSIMs found
+        # List of MovingAverages holding X number of calculated SSIMs for each burner
+        # median SSIM is determined once each queue reaches X SSIMs
+        self.median_SSIM = [MovingAverage(SSIM_count),
+                            MovingAverage(SSIM_count),
+                            MovingAverage(SSIM_count),
+                            MovingAverage(SSIM_count)]
+
+        # List of MovingAverages holding X number of calculated median SSIMs for each burner
+        # used to determine if a given pot is detected to be boiling
+        self.boiling = [MovingAverage(self.BOIL_COUNT),
+                        MovingAverage(self.BOIL_COUNT),
+                        MovingAverage(self.BOIL_COUNT),
+                        MovingAverage(self.BOIL_COUNT)]
+
         self.start_boiling = [0,0,0,0] # times each burner started boiling
-        self.began_boiling = [False,False,False,False] # if each burner has been detected to be boiling
         self.masks = [] # mask used for each burner
 
         self.last_image = None
@@ -133,11 +148,11 @@ class BoilDetector:
         """
         Checks to see if the past values recorded in boiling
         average out to be less than a given boiling threshhold.
-        :param boiling: Queue containing an X number of median SSIM's
+        :param boiling: List containing an X number of median SSIM's
         :param thresh: Value signaling if average has fallen beneath certain boiling thresh
         :return: Boolean signaling if the input list values indicate boiling
         """
-        average = sum(list(boiling.queue())) / boiling.qsize()
+        average = sum(boiling) / len(boiling)
         if average < thresh:
             return True
         else:
@@ -164,14 +179,11 @@ class BoilDetector:
         :param frame: Input frame used to update boiling status
         :param stove: Stove object holding current stove state
         """
-        # time function begins
-        start_time = time.time()
-
         # updates frames_elapsed
         self.frames_elapsed = self.frames_elapsed + 1
         burners = stove.get_burners()
 
-        # creates new masks if a pot was added
+        # creates new masks if a pot was added or thresh changes
         self.initialize_masks(burners)
 
         # if program has not executed before
@@ -195,45 +207,43 @@ class BoilDetector:
             self.current_quads = self.__split_frame(self.current_image)
 
             # Detects boiling on active burners
-            curr_idx = 0 # index corresponding to current burner
-            for burner in burners:
+            for idx, burner, burner_mask, last_quad, current_quad in enumerate(zip(burners, self.masks, self.last_quads, self.current_quads)):
                 # if there is a pot on burner
                 if burner.pot_detected:
-                    mask = self.masks[curr_idx]
-                    score = self.___get_score(mask, self.last_quads[curr_idx], self.current_quads[curr_idx])
-
-                    # pops element from median values if queue is full
-                    if self.median_SSIM[curr_idx].full():
-                        self.median_SSIM[curr_idx].get()
-                    self.median_SSIM[curr_idx].put(score)
+                    score = self.___get_score(burner_mask, last_quad, current_quad)
+                    self.median_SSIM[idx].process(score)
 
                     # median is calculated when enough SSIMs have been recorded
-                    if self.median_SSIM[curr_idx].qsize() == self.SSIM_count:
-                        med = np.median(list(self.median_SSIM[curr_idx].queue()))
-                        self.boiling[curr_idx].put(med)
+                    if len(self.median_SSIM[idx].values) == self.SSIM_count:
+                        med = np.median(self.median_SSIM[idx].values)
+                        self.median_SSIM[idx].values.clear() # clear median queue
+                        self.boiling[idx].process(med)
 
-                    # ensures that the boiling list is not empty before trying to calculate status
-                    if self.boiling[curr_idx].qsize() > 0:
-                        # waits to set boiling flag until 30 seconds has passed and the began_boiling flag remains true
-                        if self.began_boiling[curr_idx] and time.time() - self.start_boiling[curr_idx] >= 30:
-                            burner.boiling = True
-                        elif self.began_boiling[curr_idx]:
-                            self.began_boiling[curr_idx] = self.__check_boiling(self.boiling[curr_idx], self.thresh)
-                            # if beganBoiling becomes false, resets the flag
-                            if not self.began_boiling[curr_idx]:
-                                self.start_boiling[curr_idx] = time.time()  # sets time to when it began boiling
-                        else:
-                            self.began_boiling[curr_idx] = self.__check_boiling(self.boiling[curr_idx], self.thresh)
-                            self.start_boiling[curr_idx] = time.time() # keeps track of time when started boiling
-
-                            # remove one element from the queue every time 30 seconds have passed or boiling began
-                            if self.began_boiling[curr_idx] or time.time() - start_time >= 30:
-                                self.boiling[curr_idx].get()
-                curr_idx = curr_idx + 1
+                    # check that at least 1 value is in boiling list
+                    if len(self.boiling.values) > 0:
+                        # not boiling
+                        if self.state[idx] is BoilState.not_boiling:
+                            # if it began to boil
+                            if self.__check_boiling(self.boiling[idx].values, self.thresh):
+                                self.state[idx] = BoilState.is_simmering
+                                self.start_boiling[idx] = time.time()  # keeps track of time when started boiling
+                        # began to boil
+                        elif self.state[idx] is BoilState.is_simmering:
+                            # boiling if +30 seconds passed
+                            if time.time() - self.start_boiling[idx] >= 30:
+                                self.state[idx] = BoilState.is_boiling
+                            # not boiling if check_boiling returns False
+                            elif not self.__check_boiling(self.boiling[idx].values, self.thresh):
+                                self.state[idx] = BoilState.not_boiling
+                        # confirmed to be boiling
+                        elif self.state[idx] is BoilState.is_boiling:
+                            # if it stops boiling after having been confirmed
+                            if not self.__check_boiling(self.boiling[idx].values, self.thresh):
+                                self.state[idx] = BoilState.not_boiling
 
         # sets appropriate stove burners to boiling
-        for burner in burners:
-            if burner.boiling and burner.temp >= self.MIN_BOILING_TEMP:
-                burner.boiling = True # keeps True value
+        for burner, burner_boil in zip(burners,self.boiling):
+            if burner_boil and burner.temp >= self.MIN_BOILING_TEMP:
+                burner.boiling = True # Boiling is True
             else:
-                burner.boiling = False # changes if temp not high enough
+                burner.boiling = False # False if not boiling / temp too low

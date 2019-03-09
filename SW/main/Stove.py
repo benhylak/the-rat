@@ -10,12 +10,7 @@ class Stove:
         Returns a list of the Burners in the Stove object
         :return: List of the burners
         """
-        burners = []
-        burners.append(self.upper_left)
-        burners.append(self.upper_right)
-        burners.append(self.lower_left)
-        burners.append(self.lower_right)
-        return burners
+        return [self.upper_left,self.upper_right,self.lower_left,self.lower_right]
 
 class Burner:
     def __init__(self, name):
