@@ -31,26 +31,29 @@ class ThermalMeasure:
         self.grid_x, self.grid_y = np.mgrid[0:7:32j, 0:7:32j]
         
         #height and width of processed image
-        self.height = 32
-        self.width = 32
+        self.HEIGHT = 32
+        self.WIDTH = 32
         
         #minimum contour area
-        self.min_area = 20
+        self.MIN_AREA = 50
         
         #minimum temperature 
-        self.min_temp = 30
+        self.MIN_TEMP = 30
         
         #cap on maximum temperature for input picture
-        self.temp_cap = 80
+        self.TEMP_CAP = 80
         
         #maximum color mapping
-        self.max_color = 240
+        self.MAX_COLOR = 240
         
-        self.max_samples = 20 #the number of samples in the temperature average array
-        self.moving_average_ur = MovingAverage(self.max_samples)
-        self.moving_average_ul = MovingAverage(self.max_samples)
-        self.moving_average_ll = MovingAverage(self.max_samples)
-        self.moving_average_lr = MovingAverage(self.max_samples)
+        #the number of samples in the temperature average array
+        self.MAX_SAMPLES = 20 
+        
+        #create a moving average list for each burner
+        self.moving_average_ur = MovingAverage(self.MAX_SAMPLES)
+        self.moving_average_ul = MovingAverage(self.MAX_SAMPLES)
+        self.moving_average_ll = MovingAverage(self.MAX_SAMPLES)
+        self.moving_average_lr = MovingAverage(self.MAX_SAMPLES)
 
     @staticmethod
     def map(x, in_min, in_max, out_min, out_max):
@@ -111,7 +114,7 @@ class ThermalMeasure:
             # map the color values back to temperature values
             reverse_map = [self.map(p, min(lst_intensities[c_index]), max(lst_intensities[c_index]), min(pixels_in), max(pixels_in)) for p in lst_intensities[c_index]]
             if len(reverse_map) != 0:
-                if c_area > self.min_area:
+                if c_area > self.MIN_AREA:
                     temp = sum(reverse_map)/len(reverse_map)
                     #use the moving average array passed in to get the average of temperature over time
                     temp_avg = moving_average.process(temp)
@@ -139,42 +142,42 @@ class ThermalMeasure:
         pixels_lr = ary2[int(len(ary2)/2):]
         
         #map the output image to pixel values with no temperature cap
-        pixels_out = [self.map(p, min(pixels), max(pixels), 0, self.max_color) for p in pixels]
+        pixels_out = [self.map(p, min(pixels), max(pixels), 0, self.MAX_COLOR) for p in pixels]
         bicubic_out = griddata(self.points, pixels_out, (self.grid_x, self.grid_y), method='cubic')
 
         #output picture has the pixel values mapped correctly
         out = np.array(bicubic_out)
         
         #set the maximum temperature to the temperature cap
-        pixels_cap = [max(min(p, self.temp_cap), 0) for p in pixels]
+        pixels_cap = [max(min(p, self.TEMP_CAP), 0) for p in pixels]
 
         #if the maximum temperature is low, map the maximum color to the temperature cap
-        if max(pixels_cap) < self.min_temp:
-            pixels_in = [self.map(p, min(pixels_cap), self.temp_cap, 0, self.max_color) for p in pixels_cap]
+        if max(pixels_cap) < self.MIN_TEMP:
+            pixels_in = [self.map(p, min(pixels_cap), self.TEMP_CAP, 0, self.MAX_COLOR) for p in pixels_cap]
         else:
-            pixels_in = [self.map(p, min(pixels_cap), max(pixels_cap), 0, self.max_color) for p in pixels_cap]
+            pixels_in = [self.map(p, min(pixels_cap), max(pixels_cap), 0, self.MAX_COLOR) for p in pixels_cap]
 
         bicubic_in = griddata(self.points, pixels_in, (self.grid_x, self.grid_y), method='cubic')
 
         #input image has a cap on the maximum temperature
         img = np.array(bicubic_in)
 
-        img.resize((self.height,self.width))
+        img.resize((self.HEIGHT,self.WIDTH))
 
         #split input and output images to represent each burner and get their temperatures
 
-        upper_left_in = img[0:int((self.width/2)), 0:int((self.height/2))]
-        upper_left_out = out[0:int((self.width/2)), 0:int((self.height/2))]
+        upper_left_in = img[0:int((self.WIDTH/2)), 0:int((self.HEIGHT/2))]
+        upper_left_out = out[0:int((self.WIDTH/2)), 0:int((self.HEIGHT/2))]
         stove.upper_left.temp = self.get_temperature(upper_left_in, upper_left_out, pixels_ul, self.moving_average_ul)
 
-        lower_left_in = img[int((self.width/2)):self.width, 0:int((self.height/2))]
-        lower_left_out = out[int((self.width/2)):self.width, 0:int((self.height/2))]
+        lower_left_in = img[int((self.WIDTH/2)):self.WIDTH, 0:int((self.HEIGHT/2))]
+        lower_left_out = out[int((self.WIDTH/2)):self.WIDTH, 0:int((self.HEIGHT/2))]
         stove.lower_left.temp = self.get_temperature(lower_left_in, lower_left_out, pixels_ll, self.moving_average_ll)
         
-        upper_right_in = img[0:int((self.width/2)), int((self.height/2)):self.height]
-        upper_right_out = out[0:int((self.width/2)), int((self.height/2)):self.height]
+        upper_right_in = img[0:int((self.WIDTH/2)), int((self.HEIGHT/2)):self.HEIGHT]
+        upper_right_out = out[0:int((self.WIDTH/2)), int((self.HEIGHT/2)):self.HEIGHT]
         stove.upper_right.temp = self.get_temperature(upper_right_in, upper_right_out, pixels_ur, self.moving_average_ur)
 
-        lower_right_in = img[int((self.width/2)):self.width, int((self.height/2)):self.height]
-        lower_right_out = out[int((self.width/2)):self.width, int((self.height/2)):self.height]
+        lower_right_in = img[int((self.WIDTH/2)):self.WIDTH, int((self.HEIGHT/2)):self.HEIGHT]
+        lower_right_out = out[int((self.WIDTH/2)):self.WIDTH, int((self.HEIGHT/2)):self.HEIGHT]
         stove.lower_right.temp = self.get_temperature(lower_right_in, lower_right_out, pixels_lr, self.moving_average_lr)
