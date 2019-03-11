@@ -3,11 +3,13 @@ import firebase_admin
 import time
 import argparse
 from firebase_admin import credentials, db
-from capture_undistorted import capture
+from capture_distorted import capture
+from capture_undistorted import undistort
 
 from Stove import Stove
 from Thermal import ThermalMeasure
 from pot_detection import PotDetector
+from boil_detect import BoilDetector
 
 ITERATION_TIME = 0.5
 
@@ -25,17 +27,19 @@ def main(detect_pots, update_time):
     thermal = ThermalMeasure()
     stove = Stove()
     pot_detector = PotDetector()
+    boil_detector = BoilDetector()
 
     while (True):
         
         for burner in [stove.upper_left, stove.lower_left, stove.lower_right, stove.upper_right]:
             db.child("burners").child(burner.name).set(vars(burner))
 
-        image_path = capture()
+        original_image_path = capture()
+        modified_image_path = undistort(original_image_path)
 
-        with open(image_path, mode="rb") as frame:
-            if(detect_pots == True):
-                pot_detector.update(frame, stove)
+        with open(original_image_path, mode="rb") as og_frame, open(modified_image_path, mode="rb") as mod_frame:
+                pot_detector.update(mod_frame, stove)
+                boil_detector.update(og_frame, stove)
 
         thermal.update(stove)
         

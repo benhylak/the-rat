@@ -233,7 +233,7 @@ class BoilDetector:
                     # break out of program to recalculate masks on the next call to update
                     if score <= self.MASK_THRESH:
                         break
-                    
+
                     self.median_SSIM[idx].process(score)
 
                     # median is calculated when enough SSIMs have been recorded
