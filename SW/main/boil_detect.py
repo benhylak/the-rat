@@ -22,7 +22,7 @@ class UpdateState(enum.Enum):
 class BoilDetector:
 
     def __init__self(self):
-        self.MIN_BOILING_TEMP = 170 # temp considered to be boiling
+        self.MIN_BOILING_TEMP = 0 # temp considered to be boiling
         self.THRESH = 0.985 # thresh to boil
         self.MASK_THRESH = 0.5 # thresh to recalculate mask
         self.SSIM_COUNT = 5 # how often median will be found
@@ -136,6 +136,26 @@ class BoilDetector:
         second_quad = frame[0:center_row, center_col:width]
         third_quad = frame[center_row:height, 0:center_col]
         fourth_quad = frame[center_row:height, center_col:width]
+
+        return [first_quad, second_quad, third_quad, fourth_quad]
+
+    def __split_frame_mod(self, frame):
+        """
+        Takes input frame and splits it into 4 equal quadrants.
+        Best bet so far would be to take in distorted frame.
+        Splits it as close to stove as possible.
+        :param frame: Frame to be split.
+        :return: Four images representing the split frame.
+        """
+        height, width = frame.shape[:2]
+        eighth_col = int(width / 4)
+        center_col = int(width / 2)
+        center_row = int(height / 2)
+
+        first_quad = frame[0:center_row, eighth_col:center_col]
+        second_quad = frame[0:center_row, center_col:width-eighth_col]
+        third_quad = frame[center_row:height, eighth_col:center_col]
+        fourth_quad = frame[center_row:height, center_col:width-eighth_col]
 
         return [first_quad, second_quad, third_quad, fourth_quad]
 
