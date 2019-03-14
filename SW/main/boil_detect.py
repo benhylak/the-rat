@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import time
 import queue
-import MovingAverage
+from moving_average import MovingAverage
 import enum
 
 
@@ -21,7 +21,9 @@ class UpdateState(enum.Enum):
 
 class BoilDetector:
 
-    def __init__self(self):
+    def __init__(self):
+        # temp
+        self.file = open("f.txt","a")
         self.MIN_BOILING_TEMP = 0 # temp considered to be boiling
         self.THRESH = 0.985 # thresh to boil
         self.MASK_THRESH = 0.5 # thresh to recalculate mask
@@ -41,10 +43,10 @@ class BoilDetector:
 
         # List of MovingAverages holding X number of calculated SSIMs for each burner
         # median SSIM is determined once each queue reaches X SSIMs
-        self.median_SSIM = [MovingAverage(SSIM_COUNT),
-                            MovingAverage(SSIM_COUNT),
-                            MovingAverage(SSIM_COUNT),
-                            MovingAverage(SSIM_COUNT)]
+        self.median_SSIM = [MovingAverage(self.SSIM_COUNT),
+                            MovingAverage(self.SSIM_COUNT),
+                            MovingAverage(self.SSIM_COUNT),
+                            MovingAverage(self.SSIM_COUNT)]
 
         # List of MovingAverages holding X number of calculated median SSIMs for each burner
         # used to determine if a given pot is detected to be boiling
@@ -206,19 +208,20 @@ class BoilDetector:
                 idx = masks.index(mask)
                 self.masks[idx] = None
 
-    def update(self, frame, stove):
+    def update(self, frame_path, stove):
         """
         Takes an input frame and updates the boiling state of the burners.
-        :param frame: Input frame used to update boiling status
+        :param frame_path: Input frame path to be used to update boiling status
         :param stove: Stove object holding current stove state
         """
         # recurring processes
+        frame = cv2.imread(frame_path)
         # updates frames_elapsed
         self.frames_elapsed = self.frames_elapsed + 1
         burners = stove.get_burners()
 
         # creates new masks if a pot was added or thresh changes
-        self.initialize_masks(burners)
+        self.__initialize_masks(burners)
 
         # initial setup
         if self.update_state is UpdateState.initial_setup:
@@ -230,7 +233,7 @@ class BoilDetector:
 
         # processing frames until reached desire frame_frequency
         if self.update_state is UpdateState.process_frames:
-            if self.frames_elapsed == self.frame_frequency:
+            if self.frames_elapsed == self.FRAME_FREQUENCY:
                 self.update_state = UpdateState.perform_comparison
 
         # if reached required frame frequency to perform boiling comparison
@@ -246,9 +249,10 @@ class BoilDetector:
             # Detects boiling on active burners
             for idx, burner, burner_mask, last_quad, current_quad in enumerate(zip(burners, self.masks, self.last_quads, self.current_quads)):
                 # if there is a pot on burner
-                if burner.pot_detected:
+                if not burner.pot_detected: #change back to not
                     score = self.___get_score(burner_mask, last_quad, current_quad)
-
+                    self.file.write("S {}\n".format(score))
+                    self.file.flush()
                     # if score is too low, means pot might have been moved/change occurs
                     # break out of program to recalculate masks on the next call to update
                     if score <= self.MASK_THRESH:
@@ -274,12 +278,12 @@ class BoilDetector:
                         elif self.boil_state[idx] is BoilState.is_simmering:
                             # boiling if +30 seconds passed
                             if time.time() - self.start_boiling[idx] >= 30:
-                                self.state[idx] = BoilState.is_boiling
+                                self.boil_state[idx] = BoilState.is_boiling
                             # not boiling if check_boiling returns False
                             elif not self.__check_boiling(self.boiling[idx].values, self.THRESH):
                                 self.boil_state[idx] = BoilState.not_boiling
                         # confirmed to be boiling
-                        elif self.state[idx] is BoilState.is_boiling:
+                        elif self.boil_state[idx] is BoilState.is_boiling:
                             # if it stops boiling after having been confirmed
                             if not self.__check_boiling(self.boiling[idx].values, self.THRESH):
                                 self.boil_state[idx] = BoilState.not_boiling
@@ -287,8 +291,9 @@ class BoilDetector:
             self.update_state = UpdateState.process_frames
 
         # sets appropriate stove burners to boiling
-        for burner, burner_boil in zip(burners,self.boiling):
-            if burner_boil and burner.temp >= self.MIN_BOILING_TEMP:
+        for burner, burner_boil in zip(burners,self.boil_state):
+            if burner_boil is BoilState.is_boiling and burner.temp >= self.MIN_BOILING_TEMP:
                 burner.boiling = True # Boiling is True
             else:
                 burner.boiling = False # False if not boiling / temp too low
+        self.file.close()
