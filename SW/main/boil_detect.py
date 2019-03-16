@@ -216,6 +216,8 @@ class BoilDetector:
         """
         # recurring processes
         frame = cv2.imread(frame_path)
+        self.file = open("f.txt", "a")
+        
         # updates frames_elapsed
         self.frames_elapsed = self.frames_elapsed + 1
         burners = stove.get_burners()
