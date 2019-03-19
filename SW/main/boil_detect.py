@@ -24,8 +24,8 @@ class BoilDetector:
     def __init__(self):
         # temp
         self.file = open("f.txt", "a")
-        self.MIN_BOILING_TEMP = 0  # temp considered to be boiling
-        self.THRESH = 0.985  # thresh to boil
+        self.MIN_BOILING_TEMP = 70  # temp considered to be boiling
+        self.THRESH = 0.85  # thresh to boil
         self.MASK_THRESH = 0.5  # thresh to recalculate mask
         self.SSIM_COUNT = 5  # how often median will be found
         self.BOIL_COUNT = 10  # window size of the boiling list
@@ -179,7 +179,7 @@ class BoilDetector:
         # compare the two images
         return self.__compare_images(gray1, gray2)
 
-    def __check_boiling(boiling, thresh):
+    def __check_boiling(self, boiling, thresh):
         """
         Checks to see if the past values recorded in boiling
         average out to be less than a given boiling threshhold.
